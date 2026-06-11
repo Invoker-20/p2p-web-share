@@ -19,6 +19,8 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [transferSpeed, setTransferSpeed] = useState(0);
   const [verificationStatus,setVerificationStatus] =useState("");
+  const [shareLink, setShareLink] =useState("");
+
 
   const roomIdRef = useRef("");
   const joinRoomIdRef = useRef("");
@@ -40,6 +42,10 @@ function App() {
     socket.on("room-created", (id) => {
     roomIdRef.current = id;
     setRoomId(id);
+    const link =
+  `${window.location.origin}?room=${id}`;
+
+setShareLink(link);
     setStatus("Waiting for Receiver...");
   });
     socket.on("room-joined", (roomId) => {
@@ -463,6 +469,32 @@ socket.on(
     
   };
   }, []);
+
+
+
+
+useEffect(() => {
+
+  const params =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  const room =
+    params.get("room");
+
+  if (room) {
+
+    setJoinRoomId(room);
+
+  }
+
+}, []);
+
+
+
+
+
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     setSelectedFile(file);
@@ -525,6 +557,22 @@ const joinRoom = () => {
       <p>
         Room ID: {roomId}
       </p>
+      {shareLink && (
+    <p>
+    Link: {shareLink}
+    </p>
+      )}
+      {shareLink && (
+  <button
+    onClick={() =>
+      navigator.clipboard.writeText(
+        shareLink
+      )
+    }
+  >
+    Copy Link
+  </button>
+)}
 
       {status && (
       <p>
