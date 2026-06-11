@@ -6,6 +6,7 @@ import {
   createOffer,
   createAnswer,
   setRemoteAnswer,
+  calculateSHA256,
 } from "./services/webrtc";
 
 function App() {
@@ -17,7 +18,7 @@ function App() {
   const [connectionStatus, setConnectionStatus] = useState("");
   const [progress, setProgress] = useState(0);
   const [transferSpeed, setTransferSpeed] = useState(0);
-
+  const [verificationStatus,setVerificationStatus] =useState("");
 
   const roomIdRef = useRef("");
   const joinRoomIdRef = useRef("");
@@ -29,6 +30,7 @@ function App() {
   const totalChunksRef = useRef(0);
   const transferStartRef = useRef(null);
   const bytesReceivedRef = useRef(0);
+  const senderHashRef = useRef("");
 
 
   useEffect(() => {
@@ -76,7 +78,7 @@ dataChannel.send(
 
   const buffer =
   await selectedFileRef.current.arrayBuffer();
-
+  const fileHash =await calculateSHA256(buffer);
 
 
 for (
@@ -135,6 +137,12 @@ dataChannel.send(
     type: "file-complete",
   })
 );
+dataChannel.send(
+  JSON.stringify({
+    type: "file-hash",
+    hash: fileHash,
+  })
+);
 
 console.log(
   "File sent:",
@@ -184,7 +192,7 @@ console.log(
   pc.ondatachannel = (event) => {
   const dataChannel = event.channel;
   dataChannelRef.current = event.channel;
-  dataChannel.onmessage = (event) => {
+  dataChannel.onmessage = async (event) => {
 
   if (typeof event.data === "string") {
 
@@ -208,6 +216,12 @@ console.log(
 
       return;
     }
+    if (message.type === "file-hash") {
+        senderHashRef.current =
+        message.hash;
+
+    return;
+}
 
     if (
       message.type === "file-complete"
@@ -217,6 +231,24 @@ console.log(
         new Blob(
           receivedChunksRef.current
         );
+      const buffer =
+        await blob.arrayBuffer();
+      const receiverHash =
+        await calculateSHA256(buffer);
+      if (
+  receiverHash ===
+  senderHashRef.current
+) {
+
+  setVerificationStatus("Verified ");
+
+  console.log("SHA-256 Verified");
+
+} else {
+  setVerificationStatus("Corrupted ");
+
+  console.log("SHA-256 Mismatch");
+}
 
       const url =
         URL.createObjectURL(blob);
@@ -421,6 +453,11 @@ const joinRoom = () => {
     {progress > 0 && (
   <p>
     Speed: {transferSpeed} MB/s
+  </p>
+)}
+{verificationStatus && (
+  <p>
+    Integrity: {verificationStatus}
   </p>
 )}
       
