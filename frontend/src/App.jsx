@@ -48,6 +48,30 @@ function App() {
     socket.on("receiver-joined", async () => {
     setStatus("Receiver Connected");
     const pc = createPeerConnection();
+    pc.onconnectionstatechange =
+  () => {
+
+  console.log(
+    "Connection state:",
+    pc.connectionState
+  );
+
+  if (
+    pc.connectionState ===
+      "disconnected" ||
+    pc.connectionState ===
+      "failed" ||
+    pc.connectionState ===
+      "closed"
+  ) {
+
+    setConnectionStatus(
+      "Connection Lost "
+    );
+    setStatus("Receiver Disconnected");
+  }
+  
+};
     const dataChannel =
   pc.createDataChannel("fileTransfer");
   dataChannelRef.current = dataChannel;
@@ -96,7 +120,12 @@ for (
     setTimeout(resolve, 10)
   );
 }
-
+  if (
+    dataChannel.readyState !==
+    "open"
+  ) {
+    break;
+  }
   dataChannel.send(chunk);
   if (!transferStartRef.current) {
   transferStartRef.current = Date.now();
@@ -132,17 +161,20 @@ const percent =
 setProgress(percent);
 }
 
-dataChannel.send(
-  JSON.stringify({
-    type: "file-complete",
-  })
-);
-dataChannel.send(
-  JSON.stringify({
-    type: "file-hash",
-    hash: fileHash,
-  })
-);
+if (
+  dataChannel.readyState === "open"
+) {
+  if (
+  dataChannel.readyState === "open"
+) {
+  dataChannel.send(
+    JSON.stringify({
+      type: "file-hash",
+      hash: fileHash,
+    })
+  );
+}
+}
 
 console.log(
   "File sent:",
@@ -157,6 +189,18 @@ console.log(
 
   setConnectionStatus(
     "Direct Connection Established "
+  );
+};
+
+
+dataChannel.onclose = () => {
+
+  console.log(
+    "Data channel closed"
+  );
+
+  setConnectionStatus(
+    "Receiver Disconnected "
   );
 };
     pc.onicecandidate = (event) => {
@@ -189,8 +233,41 @@ console.log(
   setConnectionStatus("Creating answer...");
 
   const pc = createPeerConnection();
+  pc.onconnectionstatechange =
+  () => {
+
+  console.log(
+    "Connection state:",
+    pc.connectionState
+  );
+
+  if (
+    pc.connectionState ===
+      "disconnected" ||
+    pc.connectionState ===
+      "failed" ||
+    pc.connectionState ===
+      "closed"
+  ) {
+
+    setConnectionStatus(
+      "Connection Lost "
+    );
+    setStatus("Receiver Disconnected");
+  }
+};
   pc.ondatachannel = (event) => {
   const dataChannel = event.channel;
+  dataChannel.onclose = () => {
+
+  console.log(
+    "Data channel closed"
+  );
+
+  setConnectionStatus(
+    "Sender Disconnected "
+  );
+};
   dataChannelRef.current = event.channel;
   dataChannel.onmessage = async (event) => {
 
@@ -361,6 +438,19 @@ setProgress(percent);
     console.log("ICE candidate added");
   }
 });
+socket.on(
+  "disconnect",
+  () => {
+
+    console.log(
+      "Socket disconnected"
+    );
+
+    setConnectionStatus(
+      "Signaling Lost "
+    );
+  }
+);
 
   return () => {
     socket.off("connect");
@@ -369,6 +459,7 @@ setProgress(percent);
     socket.off("receiver-joined");
     socket.off("offer");
     socket.off("answer");
+    socket.off("disconnect");
     
   };
   }, []);
