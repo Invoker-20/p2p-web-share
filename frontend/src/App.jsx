@@ -11,6 +11,26 @@ import {
 function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [roomId, setRoomId] = useState("");
+  const [joinRoomId, setJoinRoomId] = useState("");
+  const [status, setStatus] = useState("");
+  const [peerConnection, setPeerConnection] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [transferSpeed, setTransferSpeed] = useState(0);
+
+
+  const roomIdRef = useRef("");
+  const joinRoomIdRef = useRef("");
+  const peerConnectionRef = useRef(null);
+  const dataChannelRef = useRef(null);
+  const incomingFileRef = useRef(null);
+  const selectedFileRef = useRef(null);
+  const receivedChunksRef = useRef([]);
+  const totalChunksRef = useRef(0);
+  const transferStartRef = useRef(null);
+  const bytesReceivedRef = useRef(0);
+
+
   useEffect(() => {
     socket.on("connect", () => {
     console.log("Connected:", socket.id);
@@ -76,6 +96,29 @@ for (
 }
 
   dataChannel.send(chunk);
+  if (!transferStartRef.current) {
+  transferStartRef.current = Date.now();
+}
+
+const sentBytes = i + chunk.byteLength;
+
+const elapsedSeconds =
+  (Date.now() -
+    transferStartRef.current) /
+  1000;
+
+if (elapsedSeconds > 0) {
+  const speedMBps =
+    (
+      sentBytes /
+      1024 /
+      1024 /
+      elapsedSeconds
+    ).toFixed(2);
+
+  setTransferSpeed(speedMBps);
+  
+}
   const sentChunks =
   Math.floor(i / chunkSize) + 1;
 
@@ -149,6 +192,8 @@ console.log(
       JSON.parse(event.data);
 
     if (message.type === "file-info") {
+      transferStartRef.current = Date.now();
+      bytesReceivedRef.current = 0;
       totalChunksRef.current =message.totalChunks;
 
       receivedChunksRef.current = [];
@@ -197,6 +242,25 @@ console.log(
   receivedChunksRef.current.push(
     event.data
   );
+  bytesReceivedRef.current += event.data.byteLength;
+
+const elapsedSeconds =
+  (Date.now() -
+    transferStartRef.current) /
+  1000;
+
+if (elapsedSeconds > 0) {
+
+  const speedMBps =
+    (
+      bytesReceivedRef.current /
+      1024 /
+      1024 /
+      elapsedSeconds
+    ).toFixed(2);
+
+  setTransferSpeed(speedMBps);
+}
   const received =
   receivedChunksRef.current.length;
 
@@ -304,19 +368,7 @@ const joinRoom = () => {
   joinRoomIdRef.current = joinRoomId;
   socket.emit("join-room", joinRoomId);
 };
-const [joinRoomId, setJoinRoomId] = useState("");
-const [status, setStatus] = useState("");
-const [peerConnection, setPeerConnection] = useState(null);
-const [connectionStatus, setConnectionStatus] = useState("");
-const roomIdRef = useRef("");
-const joinRoomIdRef = useRef("");
-const peerConnectionRef = useRef(null);
-const dataChannelRef = useRef(null);
-const incomingFileRef = useRef(null);
-const selectedFileRef = useRef(null);
-const receivedChunksRef = useRef([]);
-const [progress, setProgress] = useState(0);
-const totalChunksRef = useRef(0);
+
   return (
     <div className="container">
       <h1>P2P Web Share</h1>
@@ -364,6 +416,11 @@ const totalChunksRef = useRef(0);
     {progress > 0 && (
   <p>
     Progress: {progress}%
+  </p>
+)}
+    {progress > 0 && (
+  <p>
+    Speed: {transferSpeed} MB/s
   </p>
 )}
       
