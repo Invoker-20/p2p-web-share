@@ -39,22 +39,68 @@ dataChannel.onopen = async () => {
   selectedFileRef.current
 );
   if (selectedFileRef.current) {
-  dataChannel.send(
-    JSON.stringify({
-      type: "file-info",
-      name: selectedFileRef.current.name,
-      size: selectedFileRef.current.size,
-    })
-  );
+  const chunkSize = 16 * 1024;
+
+const totalChunks = Math.ceil(
+  selectedFileRef.current.size / chunkSize
+);
+
+dataChannel.send(
+  JSON.stringify({
+    type: "file-info",
+    name: selectedFileRef.current.name,
+    size: selectedFileRef.current.size,
+    totalChunks,
+  })
+);
 
   const buffer =
-    await selectedFileRef.current.arrayBuffer();
+  await selectedFileRef.current.arrayBuffer();
 
-  dataChannel.send(buffer);
+
+
+for (
+  let i = 0;
+  i < buffer.byteLength;
+  i += chunkSize
+) {
+  const chunk =
+    buffer.slice(i, i + chunkSize);
+  while (
+  dataChannel.bufferedAmount >
+  1024 * 1024
+) {
+  await new Promise(resolve =>
+    setTimeout(resolve, 10)
+  );
+}
+
+  dataChannel.send(chunk);
+  const sentChunks =
+  Math.floor(i / chunkSize) + 1;
+
+const percent =
+  Math.floor(
+    (sentChunks / totalChunks) * 100
+  );
+
+setProgress(percent);
+}
+
+dataChannel.send(
+  JSON.stringify({
+    type: "file-complete",
+  })
+);
+
+console.log(
+  "File sent:",
+  selectedFileRef.current.name
+);
 
   console.log(
     "File sent:",
-    selectedFile.name
+    selectedFileRef.current.name
   );
 }
 
@@ -103,6 +149,9 @@ dataChannel.onopen = async () => {
       JSON.parse(event.data);
 
     if (message.type === "file-info") {
+      totalChunksRef.current =message.totalChunks;
+
+      receivedChunksRef.current = [];
 
       incomingFileRef.current =
         message;
@@ -111,31 +160,55 @@ dataChannel.onopen = async () => {
         "Receiving file:",
         message.name
       );
+
+      return;
     }
 
-    return;
+    if (
+      message.type === "file-complete"
+    ) {
+
+      const blob =
+        new Blob(
+          receivedChunksRef.current
+        );
+
+      const url =
+        URL.createObjectURL(blob);
+
+      const a =
+        document.createElement("a");
+
+      a.href = url;
+
+      a.download =
+        incomingFileRef.current.name;
+
+      a.click();
+
+      console.log(
+        "Download complete"
+      );
+
+      return;
+    }
   }
 
-  console.log(
-    "Received file data"
+  receivedChunksRef.current.push(
+    event.data
+  );
+  const received =
+  receivedChunksRef.current.length;
+
+const total =
+  totalChunksRef.current;
+
+const percent =
+  Math.floor(
+    (received / total) * 100
   );
 
-  const blob =
-    new Blob([event.data]);
-
-  const url =
-    URL.createObjectURL(blob);
-
-  const a =
-    document.createElement("a");
-
-  a.href = url;
-
-  a.download =
-    incomingFileRef.current?.name ||
-    "received-file";
-
-  a.click();
+setProgress(percent);
 };
 
   dataChannel.onopen = () => {
@@ -241,6 +314,9 @@ const peerConnectionRef = useRef(null);
 const dataChannelRef = useRef(null);
 const incomingFileRef = useRef(null);
 const selectedFileRef = useRef(null);
+const receivedChunksRef = useRef([]);
+const [progress, setProgress] = useState(0);
+const totalChunksRef = useRef(0);
   return (
     <div className="container">
       <h1>P2P Web Share</h1>
@@ -285,6 +361,11 @@ const selectedFileRef = useRef(null);
     {connectionStatus && (
     <p>{connectionStatus}</p>
     )}
+    {progress > 0 && (
+  <p>
+    Progress: {progress}%
+  </p>
+)}
       
       <hr />
 
