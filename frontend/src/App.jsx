@@ -91,7 +91,7 @@ dataChannel.onopen = async () => {
   selectedFileRef.current
 );
   if (selectedFileRef.current) {
-  const chunkSize = 16 * 1024;
+  const chunkSize = 64 * 1024;
 
 const totalChunks = Math.ceil(
   selectedFileRef.current.size / chunkSize
@@ -120,7 +120,7 @@ for (
     buffer.slice(i, i + chunkSize);
   while (
   dataChannel.bufferedAmount >
-  1024 * 1024
+  4*1024 * 1024
 ) {
   await new Promise(resolve =>
     setTimeout(resolve, 10)
@@ -170,16 +170,19 @@ setProgress(percent);
 if (
   dataChannel.readyState === "open"
 ) {
-  if (
-  dataChannel.readyState === "open"
-) {
+
   dataChannel.send(
     JSON.stringify({
       type: "file-hash",
       hash: fileHash,
     })
   );
-}
+
+  dataChannel.send(
+    JSON.stringify({
+      type: "file-complete",
+    })
+  );
 }
 
 console.log(
