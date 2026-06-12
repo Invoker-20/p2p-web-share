@@ -120,8 +120,9 @@ for (
     buffer.slice(i, i + chunkSize);
   while (
   dataChannel.bufferedAmount >
-  4*1024 * 1024
+  8*1024 * 1024
 ) {
+  
   await new Promise(resolve =>
     setTimeout(resolve, 10)
   );
@@ -361,6 +362,8 @@ dataChannel.onclose = () => {
     event.data
   );
   bytesReceivedRef.current += event.data.byteLength;
+  const received =
+  receivedChunksRef.current.length;
 
 const elapsedSeconds =
   (Date.now() -
@@ -377,10 +380,11 @@ if (elapsedSeconds > 0) {
       elapsedSeconds
     ).toFixed(2);
 
+  if (received % 20 === 0) {
   setTransferSpeed(speedMBps);
 }
-  const received =
-  receivedChunksRef.current.length;
+}
+  
 
 const total =
   totalChunksRef.current;
@@ -390,7 +394,9 @@ const percent =
     (received / total) * 100
   );
 
-setProgress(percent);
+if (received % 20 === 0) {
+  setProgress(percent);
+}
 };
 
   dataChannel.onopen = () => {
