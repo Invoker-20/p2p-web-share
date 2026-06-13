@@ -7,7 +7,6 @@ import {
   createOffer,
   createAnswer,
   setRemoteAnswer,
-  calculateSHA256,
 } from "./services/webrtc";
 
 function App() {
