@@ -29,7 +29,6 @@ function App() {
   const dataChannelRef = useRef(null);
   const incomingFileRef = useRef(null);
   const selectedFileRef = useRef(null);
-  const receivedChunksRef = useRef([]);
   const totalChunksRef = useRef(0);
   const transferStartRef = useRef(null);
   const bytesReceivedRef = useRef(0);
@@ -224,7 +223,7 @@ if (
 }
 
 console.log(
-  "File sent:",
+  "File info sent:",
   selectedFileRef.current.name
 );
   }
@@ -319,8 +318,6 @@ dataChannel.onclose = () => {
       bytesReceivedRef.current = 0;
       totalChunksRef.current =message.totalChunks;
       receivedChunksCountRef.current = 0;
-
-      receivedChunksRef.current = [];
       receiverShaRef.current =
   await createSHA256();
 
