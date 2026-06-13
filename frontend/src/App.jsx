@@ -141,10 +141,10 @@ const totalChunks = Math.ceil(
   selectedFileRef.current.size /
   chunkSize
 );
+const sha256 =
+  await createSHA256();
 
-    const buffer =
-  await selectedFileRef.current.arrayBuffer();
-  const fileHash =await calculateSHA256(buffer);
+  
 
 
 for (
@@ -161,6 +161,9 @@ for (
 
   const bufferChunk =
     await chunk.arrayBuffer();
+  sha256.update(
+  new Uint8Array(bufferChunk)
+);
   while (
   dataChannel.bufferedAmount >
   4*1024 * 1024
@@ -214,7 +217,8 @@ const percent =
 
 setProgress(percent);
 }
-
+const fileHash =
+  sha256.digest("hex");
 if (
   dataChannel.readyState === "open"
 ) {
