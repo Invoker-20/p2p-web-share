@@ -14,8 +14,8 @@ function App() {
   const [roomId, setRoomId] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
   const [status, setStatus] = useState("");
-  const [peerConnection, setPeerConnection] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("");
+  const [peerConnection, setPeerConnection] = useState(null);
   const [progress, setProgress] = useState(0);
   const [transferSpeed, setTransferSpeed] = useState(0);
   const [verificationStatus,setVerificationStatus] =useState("");
@@ -47,7 +47,7 @@ function App() {
     const link =
   `${window.location.origin}?room=${id}`;
 
-setShareLink(link);
+  setShareLink(link);
     setStatus("Waiting for Receiver...");
   });
     socket.on("room-joined", (roomId) => {
@@ -80,77 +80,60 @@ setShareLink(link);
   }
   
 };
-    const dataChannel =
-  pc.createDataChannel("fileTransfer");
+  const dataChannel = pc.createDataChannel("fileTransfer");
   dataChannelRef.current = dataChannel;
 
-dataChannel.onopen = async () => {
-  console.log(
-    "Data channel opened"
-  );
-  console.log(
-  "selectedFileRef =",
-  selectedFileRef.current
-);
+  dataChannel.onopen = async () => {
+  console.log("Data channel opened");
+  
   if (selectedFileRef.current) {
   const chunkSize = 64 * 1024;
 
-const totalChunks = Math.ceil(
-  selectedFileRef.current.size / chunkSize
-);
+  const totalChunks = Math.ceil(selectedFileRef.current.size / chunkSize);
 
-dataChannel.send(
-  JSON.stringify({
-    type: "file-info",
-    name: selectedFileRef.current.name,
-    size: selectedFileRef.current.size,
-    totalChunks,
-  })
-);
+  dataChannel.send(
+    JSON.stringify({
+      type: "file-info",
+      name: selectedFileRef.current.name,
+      size: selectedFileRef.current.size,
+      totalChunks,
+    })
+  );
 
   
 
-  console.log(
-    "File sent:",
-    selectedFileRef.current.name
-  );
-}
+  console.log("File sent:",selectedFileRef.current.name);
+  }
 
   setConnectionStatus(
     "Direct Connection Established "
   );
 };
 
-dataChannel.onmessage = async (event) => {
+  dataChannel.onmessage = async (event) => {
 
-  const message =
-    JSON.parse(event.data);
+  const message =JSON.parse(event.data);
 
-  if (
-    message.type ===
-    "receiver-ready"
-  ) {
+  if (message.type ==="receiver-ready") {
+    console.log("Receiver ready");
+    setProgress(0);
+    setTransferSpeed(0);
+    setVerificationStatus("");
 
-    console.log(
-      "Receiver ready"
-    );
     const chunkSize = 64 * 1024;
-
-const totalChunks = Math.ceil(
-  selectedFileRef.current.size /
-  chunkSize
-);
-const sha256 =
-  await createSHA256();
+    const totalChunks = Math.ceil(
+    selectedFileRef.current.size /chunkSize
+  );
+    const sha256 =await createSHA256();
 
   
 
 
-for (
-  let offset = 0;
-  offset < selectedFileRef.current.size;
-  offset += chunkSize
-) {
+  for (
+    let offset = 0;
+    offset < selectedFileRef.current.size;
+    offset += chunkSize
+  ) {
 
   const chunk =
     selectedFileRef.current.slice(
@@ -158,20 +141,17 @@ for (
       offset + chunkSize
     );
 
-  const bufferChunk =
-    await chunk.arrayBuffer();
-  sha256.update(
-  new Uint8Array(bufferChunk)
-);
+  const bufferChunk =await chunk.arrayBuffer();
+  sha256.update(new Uint8Array(bufferChunk));
   while (
   dataChannel.bufferedAmount >
   4*1024 * 1024
-) {
+  ) {
   
   await new Promise(resolve =>
     setTimeout(resolve, 10)
   );
-}
+  }
   if (
     dataChannel.readyState !==
     "open"
@@ -181,11 +161,10 @@ for (
   dataChannel.send(bufferChunk);
   if (!transferStartRef.current) {
   transferStartRef.current = Date.now();
-}
+  }
 
-const sentBytes =
-  offset +
-  bufferChunk.byteLength;
+  const sentBytes =
+  offset +bufferChunk.byteLength;
 
 const elapsedSeconds =
   (Date.now() -
@@ -209,18 +188,18 @@ if (elapsedSeconds > 0) {
     offset / chunkSize
   ) + 1;
 
-const percent =
+  const percent =
   Math.floor(
     (sentChunks / totalChunks) * 100
   );
 
-setProgress(percent);
-}
-const fileHash =
+  setProgress(percent);
+  }
+  const fileHash =
   sha256.digest("hex");
-if (
+  if (
   dataChannel.readyState === "open"
-) {
+  ) {
 
   dataChannel.send(
     JSON.stringify({
@@ -234,28 +213,23 @@ if (
       type: "file-complete",
     })
   );
-}
-
-console.log(
-  "File info sent:",
-  selectedFileRef.current.name
-);
   }
-};
+
+  console.log("File info sent:",selectedFileRef.current.name);
+    }
+  };
 
 
-dataChannel.onclose = () => {
+  dataChannel.onclose = () => {
 
   console.log(
     "Data channel closed"
   );
 
-  setConnectionStatus(
-    "Receiver Disconnected "
-  );
-};
+  setConnectionStatus("Receiver Disconnected ");
+  };
     pc.onicecandidate = (event) => {
-  console.log("Sender ICE:", event.candidate);
+  
 
   if (event.candidate) {
     socket.emit("ice-candidate", {
@@ -263,7 +237,7 @@ dataChannel.onclose = () => {
       candidate: event.candidate,
     });
   }
-};
+  };
     peerConnectionRef.current = pc;
     setPeerConnection(pc);
   
@@ -271,13 +245,13 @@ dataChannel.onclose = () => {
 
     const offer = await createOffer(pc);
 
-    console.log("Offer generated");
+    
 
     socket.emit("offer", {
     roomId: roomIdRef.current,
     offer,
     });
-  });
+    });
     socket.on("offer", async (offer) => {
     console.log("Offer received by receiver");
 
@@ -306,30 +280,28 @@ dataChannel.onclose = () => {
     );
     setStatus("Receiver Disconnected");
   }
-};
+  };
   pc.ondatachannel = (event) => {
   const dataChannel = event.channel;
   dataChannel.onclose = () => {
 
-  console.log(
-    "Data channel closed"
-  );
+  console.log("Data channel closed");
 
-  setConnectionStatus(
-    "Sender Disconnected "
-  );
-};
+  setConnectionStatus("Sender Disconnected ");
+  };
   dataChannelRef.current = event.channel;
   dataChannel.onmessage = async (event) => {
 
   if (typeof event.data === "string") {
 
-    const message =
-      JSON.parse(event.data);
+    const message =JSON.parse(event.data);
 
     if (message.type === "file-info") {
       transferStartRef.current = Date.now();
       bytesReceivedRef.current = 0;
+      setProgress(0);
+      setTransferSpeed(0);
+      setVerificationStatus("");
       totalChunksRef.current =message.totalChunks;
       receivedChunksCountRef.current = 0;
       receiverShaRef.current =
@@ -337,7 +309,7 @@ dataChannel.onclose = () => {
 
       incomingFileRef.current =
         message;
-      console.log("Creating writable...");
+      
       const fileHandle =await window.showSaveFilePicker({
         suggestedName: message.name,
       });
@@ -347,12 +319,9 @@ dataChannel.onclose = () => {
         type: "receiver-ready",
       })
       );
-      console.log("Writable created");
+      
 
-      console.log(
-        "Receiving file:",
-        message.name
-      );
+      console.log("Receiving file:",message.name);
 
       return;
     }
@@ -389,38 +358,17 @@ dataChannel.onclose = () => {
 
   console.log("SHA-256 Mismatch");
 }
-//
-//      const url =
-//        URL.createObjectURL(blob);
-//
-//      const a =
-//        document.createElement("a");
-//
-//      a.href = url;
-//
-//      a.download =
-//        incomingFileRef.current.name;
-//
-//      a.click();
 
-      console.log(
-        "Download complete"
-      );
-      setConnectionStatus(
-  "Transfer Complete"
-);
+
+      console.log("Download complete");
+      setConnectionStatus("Transfer Complete");
 
       return;
     }
   }
-  console.log(
-  "Writable ref:",
-  writableRef.current
-);
+  
   if (!writableRef.current) {
-  console.log(
-    "Writable not ready"
-  );
+  console.log("Writable not ready");
   return;
 }
 
@@ -456,8 +404,7 @@ if (elapsedSeconds > 0) {
 }
   
 
-const total =
-  totalChunksRef.current;
+const total = totalChunksRef.current;
 
 const percent =
   Math.floor(
@@ -481,7 +428,7 @@ if (received % 20 === 0) {
 
 };
   pc.onicecandidate = (event) => {
-  console.log("Receiver ICE:", event.candidate);
+  
 
   if (event.candidate) {
     socket.emit("ice-candidate", {
@@ -496,7 +443,7 @@ if (received % 20 === 0) {
 
   const answer = await createAnswer(pc, offer);
 
-  console.log("Answer generated");
+  
 
   socket.emit("answer", {
     roomId: joinRoomIdRef.current,
@@ -541,20 +488,16 @@ if (received % 20 === 0) {
       new RTCIceCandidate(candidate)
     );
 
-    console.log("ICE candidate added");
+    
   }
 });
 socket.on(
   "disconnect",
   () => {
 
-    console.log(
-      "Socket disconnected"
-    );
+    console.log("Socket disconnected");
 
-    setConnectionStatus(
-      "Signaling Lost "
-    );
+    setConnectionStatus("Signaling Lost ");
   }
 );
 
@@ -627,6 +570,9 @@ const joinRoom = () => {
   return (
     <div className="container">
       <h1>P2P Web Share</h1>
+<p>
+  Secure peer-to-peer file transfer
+</p>
 
     <div className="upload-box"
       onDrop={handleDrop}
@@ -640,10 +586,21 @@ const joinRoom = () => {
         />
 
         {selectedFile && (
-          <p>
-            Selected: {selectedFile.name}
-          </p>
-        )}
+  <>
+    <p>
+      📄 {selectedFile.name}
+    </p>
+    <p>
+      Size:{" "}
+      {(
+        selectedFile.size /
+        1024 /
+        1024
+      ).toFixed(2)}{" "}
+      MB
+    </p>
+  </>
+)}
       </div>
 
       <button
@@ -653,51 +610,87 @@ const joinRoom = () => {
         Create Room
       </button>
       {roomId && (
-      <>
-      <p>
-        Room ID: {roomId}
-      </p>
-      {shareLink && (
-    <p>
-    Link: {shareLink}
-    </p>
-      )}
-      {shareLink && (
-  <button
-    onClick={() =>
-      navigator.clipboard.writeText(
-        shareLink
-      )
-    }
-  >
-    Copy Link
-  </button>
-)}
+  <div className="info-card">
 
-      {status && (
+    <h3>Room Details</h3>
+
+    <p>
+      <strong>Room ID:</strong>{" "}
+      {roomId}
+    </p>
+
+    {shareLink && (
       <p>
-        Status: {status}
+        <strong>Link:</strong>
+        <br />
+        {shareLink}
       </p>
-      )}
+    )}
+
+    {shareLink && (
+      <button
+        onClick={() =>
+          navigator.clipboard.writeText(
+            shareLink
+          )
+        }
+      >
+        Copy Link
+      </button>
+    )}
+
+    {status && (
+      <p>
+        <strong>Status:</strong>{" "}
+        {status}
+      </p>
+    )}
+  </div>
+)}
+    {(
+  connectionStatus ||
+  progress > 0 ||
+  verificationStatus
+) && (
+  <div className="transfer-card">
+
+    {connectionStatus && (
+      <p>
+        🔗 {connectionStatus}
+      </p>
+    )}
+
+    {progress > 0 && (
+      <>
+        <p>
+          Progress: {progress}%
+        </p>
+
+        <div className="progress-bar">
+          <div
+            className="progress-fill"
+            style={{
+              width: `${progress}%`,
+            }}
+          />
+        </div>
       </>
     )}
-    {connectionStatus && (
-    <p>{connectionStatus}</p>
+
+    {progress > 0 && (
+      <p>
+        ⚡ {transferSpeed} MB/s
+      </p>
     )}
-    {progress > 0 && (
-  <p>
-    Progress: {progress}%
-  </p>
-)}
-    {progress > 0 && (
-  <p>
-    Speed: {transferSpeed} MB/s
-  </p>
-)}
-{verificationStatus && (
-  <p>
-    Integrity: {verificationStatus}
-  </p>
+
+    {verificationStatus && (
+      <p>
+        ✅ Integrity:
+        {" "}
+        {verificationStatus}
+      </p>
+    )}
+  </div>
 )}
       
       <hr />
