@@ -1,6 +1,7 @@
 import { useState , useEffect , useRef} from "react";
 import "./App.css";
 import socket from "./services/socket";
+import { createSHA256 } from "hash-wasm";
 import {
   createPeerConnection,
   createOffer,
@@ -33,6 +34,9 @@ function App() {
   const transferStartRef = useRef(null);
   const bytesReceivedRef = useRef(0);
   const senderHashRef = useRef("");
+  const writableRef = useRef(null);
+  const receivedChunksCountRef =useRef(0);
+  const receiverShaRef = useRef(null);
 
 
   useEffect(() => {
@@ -106,7 +110,40 @@ dataChannel.send(
   })
 );
 
-  const buffer =
+  
+
+  console.log(
+    "File sent:",
+    selectedFileRef.current.name
+  );
+}
+
+  setConnectionStatus(
+    "Direct Connection Established "
+  );
+};
+
+dataChannel.onmessage = async (event) => {
+
+  const message =
+    JSON.parse(event.data);
+
+  if (
+    message.type ===
+    "receiver-ready"
+  ) {
+
+    console.log(
+      "Receiver ready"
+    );
+    const chunkSize = 64 * 1024;
+
+const totalChunks = Math.ceil(
+  selectedFileRef.current.size /
+  chunkSize
+);
+
+    const buffer =
   await selectedFileRef.current.arrayBuffer();
   const fileHash =await calculateSHA256(buffer);
 
@@ -120,7 +157,7 @@ for (
     buffer.slice(i, i + chunkSize);
   while (
   dataChannel.bufferedAmount >
-  8*1024 * 1024
+  4*1024 * 1024
 ) {
   
   await new Promise(resolve =>
@@ -190,16 +227,7 @@ console.log(
   "File sent:",
   selectedFileRef.current.name
 );
-
-  console.log(
-    "File sent:",
-    selectedFileRef.current.name
-  );
-}
-
-  setConnectionStatus(
-    "Direct Connection Established "
-  );
+  }
 };
 
 
@@ -290,11 +318,25 @@ dataChannel.onclose = () => {
       transferStartRef.current = Date.now();
       bytesReceivedRef.current = 0;
       totalChunksRef.current =message.totalChunks;
+      receivedChunksCountRef.current = 0;
 
       receivedChunksRef.current = [];
+      receiverShaRef.current =
+  await createSHA256();
 
       incomingFileRef.current =
         message;
+      console.log("Creating writable...");
+      const fileHandle =await window.showSaveFilePicker({
+        suggestedName: message.name,
+      });
+      writableRef.current = await fileHandle.createWritable();
+      dataChannel.send(
+        JSON.stringify({
+        type: "receiver-ready",
+      })
+      );
+      console.log("Writable created");
 
       console.log(
         "Receiving file:",
@@ -313,15 +355,15 @@ dataChannel.onclose = () => {
     if (
       message.type === "file-complete"
     ) {
+      setProgress(100);
+      setTransferSpeed(0);
+      await writableRef.current.close();
 
-      const blob =
-        new Blob(
-          receivedChunksRef.current
+      console.log(
+      "Writable closed"
         );
-      const buffer =
-        await blob.arrayBuffer();
-      const receiverHash =
-        await calculateSHA256(buffer);
+
+      const receiverHash =receiverShaRef.current.digest("hex");
       if (
   receiverHash ===
   senderHashRef.current
@@ -336,34 +378,51 @@ dataChannel.onclose = () => {
 
   console.log("SHA-256 Mismatch");
 }
-
-      const url =
-        URL.createObjectURL(blob);
-
-      const a =
-        document.createElement("a");
-
-      a.href = url;
-
-      a.download =
-        incomingFileRef.current.name;
-
-      a.click();
+//
+//      const url =
+//        URL.createObjectURL(blob);
+//
+//      const a =
+//        document.createElement("a");
+//
+//      a.href = url;
+//
+//      a.download =
+//        incomingFileRef.current.name;
+//
+//      a.click();
 
       console.log(
         "Download complete"
       );
+      setConnectionStatus(
+  "Transfer Complete"
+);
 
       return;
     }
   }
-
-  receivedChunksRef.current.push(
-    event.data
+  console.log(
+  "Writable ref:",
+  writableRef.current
+);
+  if (!writableRef.current) {
+  console.log(
+    "Writable not ready"
   );
+  return;
+}
+
+await writableRef.current.write(
+  event.data
+);
+receiverShaRef.current.update(
+  new Uint8Array(event.data)
+);
+receivedChunksCountRef.current++;
   bytesReceivedRef.current += event.data.byteLength;
   const received =
-  receivedChunksRef.current.length;
+  receivedChunksCountRef.current;
 
 const elapsedSeconds =
   (Date.now() -
@@ -408,6 +467,7 @@ if (received % 20 === 0) {
       "Direct Connection Established "
     );
   };
+
 };
   pc.onicecandidate = (event) => {
   console.log("Receiver ICE:", event.candidate);
@@ -433,7 +493,27 @@ if (received % 20 === 0) {
   });
 });
   socket.on("answer", async (answer) => {
-  console.log("Answer received by sender");
+
+  console.log(
+    "Answer received by sender"
+  );
+
+  console.log(
+    "Signaling state:",
+    peerConnectionRef.current
+      ?.signalingState
+  );
+
+  if (
+    peerConnectionRef.current
+      ?.signalingState !==
+    "have-local-offer"
+  ) {
+    console.log(
+      "Ignoring duplicate answer"
+    );
+    return;
+  }
 
   await setRemoteAnswer(
     peerConnectionRef.current,
@@ -626,3 +706,7 @@ const joinRoom = () => {
 }
 
 export default App;
+
+
+
+
