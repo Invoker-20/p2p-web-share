@@ -148,12 +148,19 @@ const totalChunks = Math.ceil(
 
 
 for (
-  let i = 0;
-  i < buffer.byteLength;
-  i += chunkSize
+  let offset = 0;
+  offset < selectedFileRef.current.size;
+  offset += chunkSize
 ) {
+
   const chunk =
-    buffer.slice(i, i + chunkSize);
+    selectedFileRef.current.slice(
+      offset,
+      offset + chunkSize
+    );
+
+  const bufferChunk =
+    await chunk.arrayBuffer();
   while (
   dataChannel.bufferedAmount >
   4*1024 * 1024
@@ -169,12 +176,14 @@ for (
   ) {
     break;
   }
-  dataChannel.send(chunk);
+  dataChannel.send(bufferChunk);
   if (!transferStartRef.current) {
   transferStartRef.current = Date.now();
 }
 
-const sentBytes = i + chunk.byteLength;
+const sentBytes =
+  offset +
+  bufferChunk.byteLength;
 
 const elapsedSeconds =
   (Date.now() -
@@ -194,7 +203,9 @@ if (elapsedSeconds > 0) {
   
 }
   const sentChunks =
-  Math.floor(i / chunkSize) + 1;
+  Math.floor(
+    offset / chunkSize
+  ) + 1;
 
 const percent =
   Math.floor(
